@@ -267,8 +267,6 @@ namespace app {
 
 						if (::FindNextChangeNotification(handle) == FALSE)
 						{
-							::MessageBoxW(nullptr, L"FAILED", L"TEST", MB_OK);
-
 							break;
 						}
 					}
