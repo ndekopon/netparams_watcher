@@ -3,6 +3,8 @@
 #include "worker_thread.hpp"
 
 #include <chrono>
+#include <regex>
+#include <set>
 
 #include <shlobj.h>
 #include <objbase.h>
@@ -100,15 +102,43 @@ namespace {
 		return r;
 	}
 
-	bool remove_old_backup()
+	bool remove_old_backup(const std::wstring &path)
 	{
+		WIN32_FIND_DATA ffd;
+		const std::wregex re(LR"(^netparams_[0-9]{8}_[0-9]{6}$)"); // ファイル名の条件
+		std::set<std::wstring> filenames;
+
 		// ディレクトリ一覧を取得
+		auto search_path = path + L"\\*";
+		auto handle = ::FindFirstFileW(search_path.c_str(), &ffd);
+		if (handle == INVALID_HANDLE_VALUE)
+		{
+			return false;
+		}
 
-		// 正規表現にあってるものを残す
+		do
+		{
+			if (!(ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+			{
+				std::wstring name = ffd.cFileName;
+				if (std::regex_match(name, re))
+				{
+					filenames.insert(name);
+				}
+			}
+		} while (::FindNextFileW(handle, &ffd) != 0);
 
-		// ソート
+		// 10世代以上は削除
+		auto size = filenames.size();
+		while (size > 10)
+		{
+			const auto &name = *filenames.begin();
+			std::wstring delete_path = path + L"\\" + name;
+			::DeleteFileW(delete_path.c_str());
+			filenames.erase(filenames.begin());
+			size--;
+		}
 
-		// 削除
 		return true;
 	}
 
@@ -172,108 +202,106 @@ namespace app {
 
 		auto hr = ::CoInitializeEx(0, COINIT_MULTITHREADED);
 
+		auto watch_path = get_apex_netparam_dir();
+		auto netparams_path = watch_path + L"\\netparams";
+		auto backup_path = get_backup_dir();
+		std::vector<uint8_t> buffer;
+		buffer.resize(1024 * 64, 0); // 64kb
+
+		auto handle = ::FindFirstChangeNotificationW(watch_path.c_str(), FALSE, FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE);
+		if (handle != INVALID_HANDLE_VALUE)
 		{
-			auto watch_path = get_apex_netparam_dir();
-			auto netparams_path = watch_path + L"\\netparams";
-			auto backup_path = get_backup_dir();
-			std::vector<uint8_t> buffer;
-			buffer.resize(1024 * 64, 0); // 64kb
 
-			auto handle = ::FindFirstChangeNotificationW(watch_path.c_str(), FALSE, FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE);
-			if (handle != INVALID_HANDLE_VALUE)
+			bool netparams_exists = false;
+			std::array<BYTE, 16> backup_md5 = {};
+			std::wstring backup_file = L"";
+
+			// あらかじめバックアップ先のディレクトリを作っておく
+			if (!::PathFileExistsW(backup_path.c_str()))
 			{
+				::CreateDirectoryW(backup_path.c_str(), NULL);
+			}
 
-				bool netparams_exists = false;
-				std::array<BYTE, 16> backup_md5 = {};
-				std::wstring backup_path = L"";
+			HANDLE events[] = {
+				event_close_,
+				event_restore_,
+				handle
+			};
 
-				// あらかじめバックアップ先のディレクトリを作っておく
-				if (!::PathFileExistsW(backup_path.c_str()))
+			while (true)
+			{
+				auto id = WaitForMultipleObjects(ARRAYSIZE(events), events, FALSE, INFINITE);
+
+				if (id == WAIT_OBJECT_0)
 				{
-					::CreateDirectoryW(backup_path.c_str(), NULL);
+					break;
 				}
-
-				HANDLE events[] = {
-					event_close_,
-					event_restore_,
-					handle
-				};
-
-				while (true)
+				else if (id == WAIT_OBJECT_0 + 1)
 				{
-					auto id = WaitForMultipleObjects(ARRAYSIZE(events), events, FALSE, INFINITE);
-
-					if (id == WAIT_OBJECT_0)
+					// リストア実施
+					if (!netparams_exists && backup_file != L"")
 					{
-						break;
-					}
-					else if (id == WAIT_OBJECT_0 + 1)
-					{
-						// リストア実施
-						if (!netparams_exists && backup_path != L"")
+						if (::CopyFileW(backup_file.c_str(), netparams_path.c_str(), TRUE))
 						{
-							if (::CopyFileW(backup_path.c_str(), netparams_path.c_str(), TRUE))
-							{
-								::PostMessageW(window_, CWM_NETPARAMS_RESTORE_OK, NULL, NULL);
-								continue;
-							}
+							::PostMessageW(window_, CWM_NETPARAMS_RESTORE_OK, NULL, NULL);
+							continue;
 						}
-						::PostMessageW(window_, CWM_NETPARAMS_RESTORE_NG, NULL, NULL);
 					}
-					else if (id == WAIT_OBJECT_0 + 2)
+					::PostMessageW(window_, CWM_NETPARAMS_RESTORE_NG, NULL, NULL);
+				}
+				else if (id == WAIT_OBJECT_0 + 2)
+				{
+					// ファイル変更通知受信
+					if (::PathFileExistsW(netparams_path.c_str()) == TRUE)
 					{
-						// ファイル変更通知受信
-						if (::PathFileExistsW(netparams_path.c_str()) == TRUE)
+						if (!netparams_exists)
 						{
-							if (!netparams_exists)
+							::PostMessageW(window_, CWM_NETPARAMS_CREATED, NULL, NULL);
+							netparams_exists = true;
+						}
+						auto readed = read_file(netparams_path, buffer);
+						if (readed > 0)
+						{
+							auto md5 = get_md5_hash(buffer, readed);
+							if (md5 != std::array<BYTE, 16>({ 0 }) && md5 != backup_md5)
 							{
-								::PostMessageW(window_, CWM_NETPARAMS_CREATED, NULL, NULL);
-								netparams_exists = true;
-							}
-							auto readed = read_file(netparams_path, buffer);
-							if (readed > 0)
-							{
-								auto md5 = get_md5_hash(buffer, readed);
-								if (md5 != std::array<BYTE, 16>({ 0 }) && md5 != backup_md5)
+								// バックアップ実施
+								backup_md5 = md5;
+								backup_file = get_backup_filename();
+								if (backup_file != L"" && ::CopyFileW(netparams_path.c_str(), backup_file.c_str(), TRUE))
 								{
-									// バックアップ実施
-									backup_md5 = md5;
-									backup_path = get_backup_filename();
-									if (backup_path != L"" && ::CopyFileW(netparams_path.c_str(), backup_path.c_str(), TRUE))
-									{
-										// バックアップ完了、古いものを削除
-										::PostMessageW(window_, CWM_NETPARAMS_BACKUP_OK, NULL, NULL);
-										remove_old_backup();
-									}
-									else
-									{
-										// バックアップ失敗
-										::PostMessageW(window_, CWM_NETPARAMS_BACKUP_NG, NULL, NULL);
-										backup_md5.fill(0);
-										backup_path = L"";
-									}
+									// バックアップ完了、古いものを削除
+									::PostMessageW(window_, CWM_NETPARAMS_BACKUP_OK, NULL, NULL);
+									remove_old_backup(backup_path);
+								}
+								else
+								{
+									// バックアップ失敗
+									::PostMessageW(window_, CWM_NETPARAMS_BACKUP_NG, NULL, NULL);
+									backup_md5.fill(0);
+									backup_file = L"";
 								}
 							}
 						}
-						else
+					}
+					else
+					{
+						if (netparams_exists)
 						{
-							if (netparams_exists)
-							{
-								// ウィンドウにファイルがなくなったことを通知
-								::PostMessageW(window_, CWM_NETPARAMS_DELETED, NULL, NULL);
-								netparams_exists = false;
-							}
-						}
-
-						if (::FindNextChangeNotification(handle) == FALSE)
-						{
-							break;
+							// ウィンドウにファイルがなくなったことを通知
+							::PostMessageW(window_, CWM_NETPARAMS_DELETED, NULL, NULL);
+							netparams_exists = false;
 						}
 					}
-				}
 
-				::FindCloseChangeNotification(handle);
+					if (::FindNextChangeNotification(handle) == FALSE)
+					{
+						break;
+					}
+				}
 			}
+
+			::FindCloseChangeNotification(handle);
 		}
 		
 		::CoUninitialize();
