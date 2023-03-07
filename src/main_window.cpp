@@ -26,7 +26,8 @@ namespace app
 	constexpr UINT MID_CHECK_KEY = 3;
 
 	constexpr UINT TIMER_ID_F19 = 1;
-	constexpr UINT TIMER_ID_F20 = 2;
+	constexpr UINT TIMER_ID_F20_PRESS = 2;
+	constexpr UINT TIMER_ID_F20_RELEASE = 3;
 
 	const wchar_t* main_window::window_class_ = L"netparams_watcher-mainwindow";
 	const wchar_t* main_window::window_title_ = L"netparams_watcher";
@@ -245,7 +246,12 @@ namespace app
 			{
 				send_key(VK_F19, false);
 			}
-			else if (timer_id == TIMER_ID_F20)
+			else if (timer_id == TIMER_ID_F20_PRESS)
+			{
+				send_key(VK_F20, true);
+				::SetTimer(window_, TIMER_ID_F20_RELEASE, 200, NULL);
+			}
+			else if (timer_id == TIMER_ID_F20_RELEASE)
 			{
 				send_key(VK_F20, false);
 			}
@@ -259,6 +265,9 @@ namespace app
 			{
 				send_key(VK_F19, true);
 				::SetTimer(window_, TIMER_ID_F19, 200, NULL);
+
+				// F20キーを押す予定の場合は取り消し
+				::KillTimer(window_, TIMER_ID_F20_PRESS);
 			}
 			break;
 		case CWM_NETPARAMS_DELETED:
@@ -267,8 +276,8 @@ namespace app
 			}
 			if (get_key_checked())
 			{
-				send_key(VK_F20, true);
-				::SetTimer(window_, TIMER_ID_F20, 200, NULL);
+				// 1秒遅延させる
+				::SetTimer(window_, TIMER_ID_F20_PRESS, 1000, NULL);
 			}
 			break;
 		case CWM_NETPARAMS_BACKUP_OK:
