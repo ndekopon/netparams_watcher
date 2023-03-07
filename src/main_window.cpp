@@ -4,11 +4,29 @@
 
 #pragma comment(lib, "imm32.lib")
 
+namespace
+{
+	void send_key(WORD _vk, bool _press)
+	{
+		INPUT i;
+		std::memset(&i, 0, sizeof(i));
+
+		i.type = INPUT_KEYBOARD;
+		i.ki.wVk = _vk;
+		if (!_press) i.ki.dwFlags = KEYEVENTF_KEYUP;
+
+		::SendInput(1, &i, sizeof(INPUT));
+	}
+}
+
 namespace app
 {
 	constexpr UINT MID_RESTORE = 1;
 	constexpr UINT MID_CHECK_BACKUP = 2;
 	constexpr UINT MID_CHECK_KEY = 3;
+
+	constexpr UINT TIMER_ID_F19 = 1;
+	constexpr UINT TIMER_ID_F20 = 2;
 
 	const wchar_t* main_window::window_class_ = L"netparams_watcher-mainwindow";
 	const wchar_t* main_window::window_title_ = L"netparams_watcher";
@@ -119,6 +137,12 @@ namespace app
 		return true;
 	}
 
+	bool main_window::get_key_checked()
+	{
+		auto hr = ::SendMessageW(check_key_, BM_GETCHECK, 0, 0);
+		return hr == BST_CHECKED;
+	}
+
 	LRESULT main_window::window_proc(UINT _message, WPARAM _wparam, LPARAM _lparam)
 	{
 		switch (_message)
@@ -188,12 +212,37 @@ namespace app
 			}
 			break;
 
+		case WM_TIMER:
+		{
+			UINT_PTR timer_id = _wparam;
+			if (timer_id == TIMER_ID_F19)
+			{
+				send_key(VK_F19, false);
+			}
+			else if (timer_id == TIMER_ID_F20)
+			{
+				send_key(VK_F20, false);
+			}
+			::KillTimer(window_, timer_id);
+		}
+			break;
+
 		case CWM_NETPARAMS_CREATED:
 			::EnableWindow(button_, FALSE);
+			if (get_key_checked())
+			{
+				send_key(VK_F19, true);
+				::SetTimer(window_, TIMER_ID_F19, 200, NULL);
+			}
 			break;
 		case CWM_NETPARAMS_DELETED:
 			if (backup_) {
 				::EnableWindow(button_, TRUE);
+			}
+			if (get_key_checked())
+			{
+				send_key(VK_F20, true);
+				::SetTimer(window_, TIMER_ID_F20, 200, NULL);
 			}
 			break;
 		case CWM_NETPARAMS_BACKUP_OK:
