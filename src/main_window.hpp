@@ -35,6 +35,7 @@ namespace app
 		static LRESULT CALLBACK window_proc_common(HWND, UINT, WPARAM, LPARAM);
 
 		bool get_key_checked();
+		bool get_backup_checked();
 
 	public:
 		main_window(HINSTANCE);

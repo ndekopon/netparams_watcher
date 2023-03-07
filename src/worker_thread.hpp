@@ -15,6 +15,7 @@ namespace app
 	private:
 		HWND window_;
 		HANDLE thread_;
+		bool enabled_;
 		std::mutex mtx_;
 		std::mutex cfg_mtx_;
 		std::mutex stats_mtx_;
@@ -36,9 +37,11 @@ namespace app
 		worker_thread(worker_thread&&) = delete;
 		worker_thread& operator = (worker_thread&&) = delete;
 
-		bool run(HWND);
+		bool run(HWND, bool);
 		void stop();
 
 		void restore();
+		void enable();
+		void disable();
 	};
 }

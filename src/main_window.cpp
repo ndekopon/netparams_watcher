@@ -143,6 +143,12 @@ namespace app
 		return hr == BST_CHECKED;
 	}
 
+	bool main_window::get_backup_checked()
+	{
+		auto hr = ::SendMessageW(check_backup_, BM_GETCHECK, 0, 0);
+		return hr == BST_CHECKED;
+	}
+
 	LRESULT main_window::window_proc(UINT _message, WPARAM _wparam, LPARAM _lparam)
 	{
 		switch (_message)
@@ -172,7 +178,7 @@ namespace app
 				// チェックボックス追加
 				check_backup_ = ::CreateWindowExW(
 					WS_EX_TOPMOST,
-					L"BUTTON", L"backup / restore",
+					L"BUTTON", L"netparams backup",
 					WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 10, 10,
 					width - 120, 20, window_, (HMENU)(INT_PTR)MID_CHECK_BACKUP, instance_, NULL);
 				::SendMessageW(check_backup_, WM_SETFONT, (WPARAM)font_, MAKELPARAM(true, 0));
@@ -190,7 +196,7 @@ namespace app
 		}
 
 			// スレッド開始
-			if (!worker_thread_.run(window_)) return -1;
+			if (!worker_thread_.run(window_, true)) return -1;
 
 			return 0;
 
@@ -208,6 +214,11 @@ namespace app
 				if (id == MID_RESTORE)
 				{
 					worker_thread_.restore();
+				}
+				if (id == MID_CHECK_BACKUP)
+				{
+					bool rc = get_backup_checked();
+					rc ? worker_thread_.enable() : worker_thread_.disable();
 				}
 			}
 			break;

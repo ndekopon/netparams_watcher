@@ -207,6 +207,7 @@ namespace app {
 		auto backup_path = get_backup_dir();
 		std::vector<uint8_t> buffer;
 		buffer.resize(1024 * 64, 0); // 64kb
+		bool enabled = enabled_;
 
 		auto handle = ::FindFirstChangeNotificationW(watch_path.c_str(), FALSE, FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE);
 		if (handle != INVALID_HANDLE_VALUE)
@@ -231,6 +232,11 @@ namespace app {
 			while (true)
 			{
 				auto id = WaitForMultipleObjects(ARRAYSIZE(events), events, FALSE, INFINITE);
+
+				{
+					std::lock_guard<std::mutex> lock_(mtx_);
+					enabled = enabled_;
+				}
 
 				if (id == WAIT_OBJECT_0)
 				{
@@ -259,27 +265,30 @@ namespace app {
 							::PostMessageW(window_, CWM_NETPARAMS_CREATED, NULL, NULL);
 							netparams_exists = true;
 						}
-						auto readed = read_file(netparams_path, buffer);
-						if (readed > 0)
+						if (enabled)
 						{
-							auto md5 = get_md5_hash(buffer, readed);
-							if (md5 != std::array<BYTE, 16>({ 0 }) && md5 != backup_md5)
+							auto readed = read_file(netparams_path, buffer);
+							if (readed > 0)
 							{
-								// バックアップ実施
-								backup_md5 = md5;
-								backup_file = get_backup_filename();
-								if (backup_file != L"" && ::CopyFileW(netparams_path.c_str(), backup_file.c_str(), TRUE))
+								auto md5 = get_md5_hash(buffer, readed);
+								if (md5 != std::array<BYTE, 16>({ 0 }) && md5 != backup_md5)
 								{
-									// バックアップ完了、古いものを削除
-									::PostMessageW(window_, CWM_NETPARAMS_BACKUP_OK, NULL, NULL);
-									remove_old_backup(backup_path);
-								}
-								else
-								{
-									// バックアップ失敗
-									::PostMessageW(window_, CWM_NETPARAMS_BACKUP_NG, NULL, NULL);
-									backup_md5.fill(0);
-									backup_file = L"";
+									// バックアップ実施
+									backup_md5 = md5;
+									backup_file = get_backup_filename();
+									if (backup_file != L"" && ::CopyFileW(netparams_path.c_str(), backup_file.c_str(), TRUE))
+									{
+										// バックアップ完了、古いものを削除
+										::PostMessageW(window_, CWM_NETPARAMS_BACKUP_OK, NULL, NULL);
+										remove_old_backup(backup_path);
+									}
+									else
+									{
+										// バックアップ失敗
+										::PostMessageW(window_, CWM_NETPARAMS_BACKUP_NG, NULL, NULL);
+										backup_md5.fill(0);
+										backup_file = L"";
+									}
 								}
 							}
 						}
@@ -309,9 +318,10 @@ namespace app {
 		return rc;
 	}
 
-	bool worker_thread::run(HWND _window)
+	bool worker_thread::run(HWND _window, bool _enabled)
 	{
 		window_ = _window;
+		enabled_ = _enabled;
 
 		// イベント生成
 		if (event_close_ == NULL) event_close_ = ::CreateEventW(NULL, FALSE, FALSE, NULL);
@@ -340,5 +350,17 @@ namespace app {
 		{
 			::SetEvent(event_restore_);
 		}
+	}
+
+	void worker_thread::enable()
+	{
+		std::lock_guard<std::mutex> lock_(mtx_);
+		enabled_ = true;
+	}
+
+	void worker_thread::disable()
+	{
+		std::lock_guard<std::mutex> lock_(mtx_);
+		enabled_ = false;
 	}
 }
