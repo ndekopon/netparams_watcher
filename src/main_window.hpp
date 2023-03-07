@@ -3,6 +3,7 @@
 #include "common.hpp"
 
 #include "worker_thread.hpp"
+#include "config_ini.hpp"
 
 #include <shellapi.h>
 
@@ -18,6 +19,7 @@ namespace app
 		HWND check_key_;
 		HFONT font_;
 		worker_thread worker_thread_;
+		config_ini ini_;
 		bool backup_;
 
 		static const wchar_t* window_class_;

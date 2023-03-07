@@ -56,11 +56,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="src\common.hpp" />
+    <ClInclude Include="src\config_ini.hpp" />
     <ClInclude Include="src\main.hpp" />
     <ClInclude Include="src\main_window.hpp" />
     <ClInclude Include="src\worker_thread.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\config_ini.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\main_window.cpp" />
     <ClCompile Include="src\worker_thread.cpp" />

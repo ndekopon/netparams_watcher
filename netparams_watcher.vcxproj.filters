@@ -27,6 +27,9 @@
     <ClInclude Include="src\worker_thread.hpp">
       <Filter>hdr</Filter>
     </ClInclude>
+    <ClInclude Include="src\config_ini.hpp">
+      <Filter>hdr</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -36,6 +39,9 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\worker_thread.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\config_ini.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>

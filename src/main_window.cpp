@@ -43,6 +43,7 @@ namespace app
 		, check_key_(nullptr)
 		, font_(nullptr)
 		, worker_thread_()
+		, ini_()
 		, backup_(false)
 	{
 	}
@@ -154,6 +155,9 @@ namespace app
 		switch (_message)
 		{
 		case WM_CREATE:
+		{
+			auto enable_backup = ini_.get_enable_backup();
+			auto enable_key = ini_.get_enable_key();
 			// フォント作成
 			font_ = ::CreateFontW(
 			12, 0, 0, 0, FW_REGULAR,
@@ -161,7 +165,6 @@ namespace app
 				CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_MODERN,
 				L"MS Shell Dlg");
 
-		{
 			RECT rect;
 			if (::GetClientRect(window_, &rect))
 			{
@@ -182,8 +185,10 @@ namespace app
 					WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 10, 10,
 					width - 120, 20, window_, (HMENU)(INT_PTR)MID_CHECK_BACKUP, instance_, NULL);
 				::SendMessageW(check_backup_, WM_SETFONT, (WPARAM)font_, MAKELPARAM(true, 0));
-				// 既定でON
-				::SendMessageW(check_backup_, BM_SETCHECK, BST_CHECKED, 0);
+				if (enable_backup)
+				{
+					::SendMessageW(check_backup_, BM_SETCHECK, BST_CHECKED, 0);
+				}
 
 				// チェックボックス追加
 				check_key_ = ::CreateWindowExW(
@@ -192,13 +197,17 @@ namespace app
 					WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 10, 40,
 					width - 120, 20, window_, (HMENU)(INT_PTR)MID_CHECK_KEY, instance_, NULL);
 				::SendMessageW(check_key_, WM_SETFONT, (WPARAM)font_, MAKELPARAM(true, 0));
+				if (enable_key)
+				{
+					::SendMessageW(check_key_, BM_SETCHECK, BST_CHECKED, 0);
+				}
 			}
-		}
 
 			// スレッド開始
-			if (!worker_thread_.run(window_, true)) return -1;
+			if (!worker_thread_.run(window_, enable_backup)) return -1;
 
 			return 0;
+		}
 
 		case WM_DESTROY:
 			// スレッド停止
@@ -219,6 +228,12 @@ namespace app
 				{
 					bool rc = get_backup_checked();
 					rc ? worker_thread_.enable() : worker_thread_.disable();
+					ini_.set_enable_backup(rc);
+				}
+				if (id == MID_CHECK_KEY)
+				{
+					bool rc = get_key_checked();
+					ini_.set_enable_key(rc);
 				}
 			}
 			break;
