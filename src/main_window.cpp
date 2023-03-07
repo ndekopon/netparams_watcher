@@ -7,6 +7,8 @@
 namespace app
 {
 	constexpr UINT MID_RESTORE = 1;
+	constexpr UINT MID_CHECK_BACKUP = 2;
+	constexpr UINT MID_CHECK_KEY = 3;
 
 	const wchar_t* main_window::window_class_ = L"netparams_watcher-mainwindow";
 	const wchar_t* main_window::window_title_ = L"netparams_watcher";
@@ -19,6 +21,8 @@ namespace app
 		: instance_(_instance)
 		, window_(nullptr)
 		, button_(nullptr)
+		, check_backup_(nullptr)
+		, check_key_(nullptr)
 		, font_(nullptr)
 		, worker_thread_()
 		, backup_(false)
@@ -122,24 +126,42 @@ namespace app
 		case WM_CREATE:
 			// フォント作成
 			font_ = ::CreateFontW(
-			18, 0, 0, 0, FW_REGULAR,
+			12, 0, 0, 0, FW_REGULAR,
 				FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
 				CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_MODERN,
 				L"MS Shell Dlg");
 
-			// ボタン追加
 		{
 			RECT rect;
 			if (::GetClientRect(window_, &rect))
 			{
 				auto width = rect.right - rect.left;
 				auto height = rect.bottom - rect.top;
+				// ボタン追加
 				button_ = ::CreateWindowExW(
 					WS_EX_TOPMOST,
 					L"BUTTON", L"RESTORE",
-					WS_CHILD | WS_VISIBLE | WS_DISABLED | BS_PUSHBUTTON, 20, 20,
-					width - 40, height - 40, window_, (HMENU)(INT_PTR)MID_RESTORE, instance_, NULL);
+					WS_CHILD | WS_VISIBLE | WS_DISABLED | BS_PUSHBUTTON, width - 100, 10,
+					90, height - 20, window_, (HMENU)(INT_PTR)MID_RESTORE, instance_, NULL);
 				::SendMessageW(button_, WM_SETFONT, (WPARAM)font_, MAKELPARAM(true, 0));
+
+				// チェックボックス追加
+				check_backup_ = ::CreateWindowExW(
+					WS_EX_TOPMOST,
+					L"BUTTON", L"backup / restore",
+					WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 10, 10,
+					width - 120, 20, window_, (HMENU)(INT_PTR)MID_CHECK_BACKUP, instance_, NULL);
+				::SendMessageW(check_backup_, WM_SETFONT, (WPARAM)font_, MAKELPARAM(true, 0));
+				// 既定でON
+				::SendMessageW(check_backup_, BM_SETCHECK, BST_CHECKED, 0);
+
+				// チェックボックス追加
+				check_key_ = ::CreateWindowExW(
+					WS_EX_TOPMOST,
+					L"BUTTON", L"send F19 / F20 key",
+					WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 10, 40,
+					width - 120, 20, window_, (HMENU)(INT_PTR)MID_CHECK_KEY, instance_, NULL);
+				::SendMessageW(check_key_, WM_SETFONT, (WPARAM)font_, MAKELPARAM(true, 0));
 			}
 		}
 

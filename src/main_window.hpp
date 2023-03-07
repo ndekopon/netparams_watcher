@@ -14,6 +14,8 @@ namespace app
 		const HINSTANCE instance_;
 		HWND window_;
 		HWND button_;
+		HWND check_backup_;
+		HWND check_key_;
 		HFONT font_;
 		worker_thread worker_thread_;
 		bool backup_;
