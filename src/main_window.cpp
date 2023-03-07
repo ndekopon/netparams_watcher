@@ -95,7 +95,7 @@ namespace app
 		wcex.hInstance = instance_;
 		wcex.hIcon = ::LoadIconW(nullptr, IDI_APPLICATION);
 		wcex.hCursor = ::LoadCursorW(nullptr, IDC_ARROW);
-		wcex.hbrBackground = nullptr;
+		wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW);
 		wcex.lpszMenuName = nullptr;
 		wcex.lpszClassName = window_class_;
 		wcex.hIconSm = ::LoadIconW(nullptr, IDI_APPLICATION);
