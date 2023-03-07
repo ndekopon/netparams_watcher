@@ -174,12 +174,8 @@ namespace app {
 		: window_(NULL)
 		, thread_(NULL)
 		, mtx_()
-		, cfg_mtx_()
-		, stats_mtx_()
 		, event_close_(NULL)
 		, event_restore_(NULL)
-		, stats_total_skip_(0)
-		, stats_total_duplicate_(0)
 	{
 	}
 

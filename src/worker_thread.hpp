@@ -17,12 +17,8 @@ namespace app
 		HANDLE thread_;
 		bool enabled_;
 		std::mutex mtx_;
-		std::mutex cfg_mtx_;
-		std::mutex stats_mtx_;
 		HANDLE event_close_;
 		HANDLE event_restore_;
-		UINT64 stats_total_skip_;
-		UINT64 stats_total_duplicate_;
 
 		static DWORD WINAPI proc_common(LPVOID);
 		DWORD proc();
