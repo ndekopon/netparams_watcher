@@ -254,6 +254,11 @@ namespace app {
 				else if (id == WAIT_OBJECT_0 + 2)
 				{
 					// ファイル変更通知受信
+					if (::FindNextChangeNotification(handle) == FALSE)
+					{
+						break;
+					}
+
 					if (::PathFileExistsW(netparams_path.c_str()) == TRUE)
 					{
 						if (!netparams_exists)
@@ -297,11 +302,6 @@ namespace app {
 							::PostMessageW(window_, CWM_NETPARAMS_DELETED, NULL, NULL);
 							netparams_exists = false;
 						}
-					}
-
-					if (::FindNextChangeNotification(handle) == FALSE)
-					{
-						break;
 					}
 				}
 			}
